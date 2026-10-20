@@ -24,8 +24,13 @@ jobs:
       - run: uv run ruff check perception scripts
       - run: uv run black --check perception scripts
       - run: uv run mypy perception scripts
-      - run: uv run pytest -m "not model"
-      
+      - run: uv run pytest -m "not model" --cov --cov-report=term-missing --cov-report=xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
 
   model:
     needs: quality
@@ -40,12 +45,7 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('perception/detect.py', 'perception/depth.py') }}
       - run: uv sync --frozen --all-extras --group dev
-      - run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
-      - uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          fail_ci_if_error: false
+      - run: uv run pytest
       - name: Bramka jakości (metryki vs thresholds.json)
         run: uv run python scripts/evaluate.py --device cpu
       - uses: actions/upload-artifact@v4
@@ -54,7 +54,3 @@ jobs:
           name: metrics
           path: metrics.json
           if-no-files-found: ignore
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
