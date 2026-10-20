@@ -39,3 +39,9 @@ output/
 # Mutation testing
 mutants/
 mutation-report.md
+
+# Artefakty release (workflow Release)
+*.onnx
+metrics.json
+SHA256SUMS
+*.whl

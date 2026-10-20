@@ -18,3 +18,6 @@ test:
 mutation-test:
 	uv run mutmut run
 	uv run python scripts/mutation_report.py | tee mutation-report.md
+
+export-onnx:
+	uv run --extra ml --extra export python scripts/export_onnx.py --out detr.onnx
