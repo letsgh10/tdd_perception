@@ -1,4 +1,4 @@
-"""Testy wczytywania wideo: syntetyczny klip generowany w locie, bez zależności od sieci i wag."""
+"""Testy wczytywania wideo: syntetyczny klip generowany w locie, bez sieci i wag."""
 
 from pathlib import Path
 
@@ -16,7 +16,7 @@ SIZE = (640, 360)  # (szerokość, wysokość)
 
 @pytest.fixture
 def clip(tmp_path: Path) -> Path:
-    """Klip MJPG: klatka i ma jasność 10*i, żeby dało się sprawdzić, które klatki zostały wzięte."""
+    """Klip MJPG: klatka i ma jasność 10*i, by sprawdzić, które klatki wzięto."""
     path = tmp_path / "synthetic.avi"
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter.fourcc(*"MJPG"), FPS, SIZE)
     assert writer.isOpened()

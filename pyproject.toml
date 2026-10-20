@@ -42,6 +42,7 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.6",
     "mypy>=1.11",
+    "black>=26.10.1",
 ]
 
 

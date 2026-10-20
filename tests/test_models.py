@@ -1,4 +1,7 @@
-"""Testy dymne na prawdziwych wagach (pobierane z Hugging Face). Uruchamiane osobno: pytest -m model."""
+"""Testy dymne na prawdziwych wagach (pobierane z Hugging Face).
+
+Uruchamiane osobno: pytest -m model.
+"""
 
 from pathlib import Path
 
