@@ -14,3 +14,7 @@ cov:
 
 test:
 	uv run pytest -m "not model" -q
+
+mutation-test:
+	uv run mutmut run
+	uv run python scripts/mutation_report.py | tee mutation-report.md

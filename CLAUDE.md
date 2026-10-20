@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `perception` is a dashcam perception pipeline: object detection (DETR) → multi-object tracking (ByteTrack-lite with a Kalman filter) → optional relative depth estimation (Depth Anything V2), with a CLI and a Gradio UI on top. Source comments and CLI/UI strings are in Polish; code identifiers are in English.
 
-Despite the repo name (`tdd_perception`), there are currently **no test files** — only `tests/fixtures/clip.mp4`, a sample dashcam clip used as fixture input and as the Gradio example. `pytest` collects zero tests today. Coverage config (`fail_under = 60`) and the `model` marker in `pyproject.toml` describe the intended testing setup, not current reality.
+Tests live in `tests/` (one `test_<module>.py` per module, plus `test_models.py` marked `model`). They use injected fakes instead of real models, so they run without weights or network. `tests/fixtures/clip.mp4` is a sample dashcam clip used as fixture input (`sample_video_path` in `conftest.py`) and as the Gradio example. Coverage requires `fail_under = 60`.
 
 ## Commands
 
@@ -21,6 +21,8 @@ uv run pytest tests/test_x.py::test_name   # run a single test
 uv run pytest -m model           # run tests marked `model` (needs downloaded HF weights; slow)
 uv run pytest -m "not model"     # skip model-dependent tests
 
+make mutation-test              # mutation tests for perception/cli.py (mutmut) -> mutation-report.md
+
 uv run ruff check .              # lint
 uv run ruff check --fix .        # lint + autofix
 uv run mypy perception           # type-check
@@ -30,6 +32,10 @@ uv run perception-ui                                        # launch Gradio UI (
 ```
 
 Coverage is configured in `[tool.coverage.*]` in `pyproject.toml`: source is `perception`, `perception/app.py` (the Gradio UI) is omitted, and `fail_under = 60`.
+
+## Mutation testing
+
+`mutmut` (dev dependency) mutates only `perception/cli.py` and runs only `tests/test_cli.py`; see `[tool.mutmut]` in `pyproject.toml`. `scripts/mutation_report.py` turns the results into a Markdown report (score, status table, diffs of survivors with notes on equivalent mutants in `SURVIVOR_NOTES`) and fails below `--min-score`. The CI job `mutation-job` (in `.github/workflows/ci.yaml`, after `quality`) writes the report to the Job Summary with `--min-score 90`. Current state: ~98%, 8 survivors, all equivalent mutants. Generated output goes to `mutants/` (git-ignored). When changing `cli.py`, add tests that kill new survivors or add a note to `SURVIVOR_NOTES`.
 
 ## Architecture
 
@@ -47,7 +53,7 @@ The pipeline is deliberately decoupled from any specific model via dependency in
 
 **Depth** (`perception/depth.py`): `DepthEstimator` wraps a HF depth-estimation pipeline (`depth-anything/Depth-Anything-V2-Small-hf`), bicubic-upsampled back to the input resolution and min-max normalized per frame — this is *relative*, not metric, depth, and not comparable across frames/videos.
 
-**Quality gate** (`perception/gate.py`): `compute_metrics()` reduces a `RunResult` to summary stats (mean detections/frame, unique track count, mean track length, median ms/frame); `check()` compares those against a thresholds dict and returns a list of human-readable violations (empty = pass); `markdown_report()` renders both as a Markdown table — intended for CI-style regression gating on pipeline behavior/performance, though no CI workflow currently invokes it.
+**Quality gate** (`perception/gate.py`): `compute_metrics()` reduces a `RunResult` to summary stats (mean detections/frame, unique track count, mean track length, median ms/frame); `check()` compares those against a thresholds dict and returns a list of human-readable violations (empty = pass); `markdown_report()` renders both as a Markdown table — intended for CI-style regression gating on pipeline behavior/performance, and `scripts/evaluate.py` runs it in the CI `model` job against `scripts/thresholds.json`.
 
 **Entry points** (`pyproject.toml: [project.scripts]`):
 - `perception` (`cli.py`) — batch CLI: runs the full pipeline on a video file, prints per-frame detections, and can write an annotated video, a track-trails video, a colorized depth video, and/or a JSON dump of records.

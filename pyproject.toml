@@ -43,6 +43,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "black>=26.10.1",
+    "mutmut>=3",
 ]
 
 
@@ -90,3 +91,9 @@ show_missing = true
 skip_covered = false
 exclude_also = ["if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 fail_under = 60
+
+[tool.mutmut]
+source_paths = ["perception"]
+only_mutate = ["perception/cli.py"]
+pytest_add_cli_args = ["-m", "not model", "-p", "no:cacheprovider"]
+pytest_add_cli_args_test_selection = ["tests/test_cli.py"]

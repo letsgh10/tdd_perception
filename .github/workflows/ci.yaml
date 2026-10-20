@@ -54,3 +54,29 @@ jobs:
           name: metrics
           path: metrics.json
           if-no-files-found: ignore
+
+  mutation-job:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --all-extras --group dev
+      - name: Testy mutacyjne (perception/cli.py)
+        run: uv run mutmut run
+      - name: Raport (Job Summary)
+        if: always()
+        run: |
+          set +e
+          uv run python scripts/mutation_report.py --min-score 90 > mutation-report.md
+          status=$?
+          cat mutation-report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation-report.md
+          if-no-files-found: ignore
