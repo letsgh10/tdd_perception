@@ -15,7 +15,8 @@ def iou_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     def area(r: np.ndarray) -> np.ndarray:
         return (r[:, 2] - r[:, 0]) * (r[:, 3] - r[:, 1])
 
-    return inter / (area(a)[:, None] + area(b)[None, :] - inter + 1e-9)
+    union = area(a)[:, None] + area(b)[None, :] - inter
+    return np.divide(inter, union, out=np.zeros_like(inter, dtype=float), where=union > 0)
 
 
 def nms(boxes: np.ndarray, scores: np.ndarray, iou_thr: float) -> np.ndarray:
