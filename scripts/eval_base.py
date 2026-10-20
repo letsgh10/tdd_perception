@@ -209,10 +209,8 @@ def main() -> int:
     device = args.device or pick_device()
     proc = DetrImageProcessor.from_pretrained(args.model)
     model = (
-        DetrForObjectDetection.from_pretrained(  # type: ignore[arg-type]
-            args.model, attn_implementation="eager"
-        )
-        .to(device)
+        DetrForObjectDetection.from_pretrained(args.model, attn_implementation="eager")
+        .to(device)  # type: ignore[arg-type]
         .eval()
     )
     id2label = {int(i): str(n) for i, n in model.config.id2label.items()}

@@ -20,7 +20,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --frozen --group dev
+      - run: uv sync --frozen --all-extras --group dev
       - run: uv run ruff check perception scripts
       - run: uv run black --check perception scripts
       - run: uv run mypy perception scripts
@@ -39,7 +39,7 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('perception/detect.py', 'perception/depth.py') }}
-      - run: uv sync --frozen --extra ml --group dev
+      - run: uv sync --frozen --all-extras --group dev
       - run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
       - uses: codecov/codecov-action@v5
         with:
