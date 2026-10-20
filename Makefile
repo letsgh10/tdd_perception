@@ -4,7 +4,7 @@ setup:
 	uv sync --extra ml --extra ui --extra train --group dev
 
 check: 
-	uv run ruff check perception && uv run ruff format --check perception && uv run mypy perception 
+	uv run ruff check perception && uv run black --check perception && uv run mypy perception 
 
 ui: 
 	uv run --extra ml --extra ui perception-ui

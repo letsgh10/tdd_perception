@@ -22,7 +22,7 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen --group dev
       - run: uv run ruff check perception scripts
-      - run: uv run ruff format --check perception scripts
+      - run: uv run black --check perception scripts
       - run: uv run mypy perception scripts
       - run: uv run pytest -m "not model"
       
