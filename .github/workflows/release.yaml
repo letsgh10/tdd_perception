@@ -36,7 +36,7 @@ jobs:
             exit 1
           fi
 
-      - run: uv sync --frozen --extra ml --extra export --group dev
+      - run: uv sync --frozen --all-extras --group dev
       - run: uv run ruff check perception scripts
       - run: uv run pytest
       - run: uv run python scripts/evaluate.py --device cpu
