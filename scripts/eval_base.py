@@ -18,6 +18,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -26,7 +27,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from envfile import load_env  # noqa: E402
 
+from perception.boxes import iou_matrix  # noqa: E402
 from perception.detect import MODEL_ID, filter_detections  # noqa: E402
+
+Pred = tuple[np.ndarray, np.ndarray, np.ndarray]  # boksy xyxy, score, klasy
+Gt = tuple[np.ndarray, np.ndarray]  # boksy xyxy, klasy
 
 AUG_MARK = "_aug_out_"
 # klasa zbioru -> klasa COCO (None = DETR jej nie zna)
@@ -44,7 +49,8 @@ LIGHTS = ("Red-Traffic-Light", "Green-Traffic-Light")
 
 def read_gt(label: Path, w: int, h: int) -> tuple[np.ndarray, np.ndarray]:
     """YOLO (cls cx cy w h, ewentualnie wielokąt) -> boksy xyxy w pikselach i klasy."""
-    boxes, cls = [], []
+    boxes: list[list[float]] = []
+    cls: list[int] = []
     if label.is_file():
         for line in label.read_text().split("\n"):
             t = line.split()
@@ -76,19 +82,11 @@ def light_color(img: np.ndarray, box: np.ndarray) -> str:
     return "Green-Traffic-Light" if green.sum() > red.sum() else "Red-Traffic-Light"
 
 
-def iou_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    ix1 = np.maximum(a[:, None, 0], b[None, :, 0])
-    iy1 = np.maximum(a[:, None, 1], b[None, :, 1])
-    ix2 = np.minimum(a[:, None, 2], b[None, :, 2])
-    iy2 = np.minimum(a[:, None, 3], b[None, :, 3])
-    inter = np.clip(ix2 - ix1, 0, None) * np.clip(iy2 - iy1, 0, None)
-    area = lambda x: (x[:, 2] - x[:, 0]) * (x[:, 3] - x[:, 1])  # noqa: E731
-    return inter / (area(a)[:, None] + area(b)[None, :] - inter + 1e-9)
-
-
-def prf(preds, gts, classes, thr, iou_thr=0.5):
+def prf(
+    preds: list[Pred], gts: list[Gt], classes: list[int], thr: float, iou_thr: float = 0.5
+) -> dict[int, dict[str, float]]:
     """Precision / recall / F1 per klasa przy progu pewności thr (zachłanne dopasowanie po score)."""
-    out = {}
+    out: dict[int, dict[str, float]] = {}
     for c in classes:
         tp = fp = fn = 0
         for p, g in zip(preds, gts, strict=True):
@@ -122,7 +120,7 @@ def prf(preds, gts, classes, thr, iou_thr=0.5):
     return out
 
 
-def map_metrics(preds, gts, n_classes):
+def map_metrics(preds: list[Pred], gts: list[Gt], n_classes: int) -> dict[str, Any]:
     import torch
     from torchmetrics.detection import MeanAveragePrecision
 
@@ -198,7 +196,10 @@ def main() -> int:
     road_ids = set(coco_to_ds)
     print(f"{len(imgs)} obrazów z {args.data / args.split}, urządzenie {device}", flush=True)
 
-    raw, gts, shapes, pics = [], [], [], []
+    raw: list[Pred] = []
+    gts: list[Gt] = []
+    shapes: list[tuple[int, int]] = []
+    pics: list[np.ndarray | None] = []
     t0 = time.time()
     for n, path in enumerate(imgs, 1):
         img = np.array(Image.open(path).convert("RGB"))
@@ -207,7 +208,7 @@ def main() -> int:
         with torch.no_grad():
             inp = proc(images=img, return_tensors="pt").to(device)
             res = proc.post_process_object_detection(
-                model(**inp), threshold=0.05, target_sizes=torch.tensor([[h, w]])
+                model(**inp), threshold=0.05, target_sizes=[(h, w)]
             )[0]
         raw.append((res["boxes"].cpu().numpy(), res["scores"].cpu().numpy(), res["labels"].cpu().numpy()))
         shapes.append((h, w))
@@ -216,22 +217,24 @@ def main() -> int:
             print(f"  {n}/{len(imgs)}  ({(time.time() - t0) / n:.2f}s/obraz)", flush=True)
     dt = (time.time() - t0) / len(imgs)
 
-    def to_ds(b, s, l, shape, img, color):  # noqa: E741
+    def to_ds(
+        b: np.ndarray, s: np.ndarray, l: np.ndarray, img: np.ndarray | None, color: bool  # noqa: E741
+    ) -> Pred:
         keep = np.array([int(x) in road_ids for x in l], dtype=bool)
         b, s, l = b[keep], s[keep], l[keep]  # noqa: E741
         ds = np.array([coco_to_ds[int(x)] for x in l], dtype=int)
-        if color and len(b):
+        if color and len(b) and img is not None:
             for k in np.where(ds == idx[LIGHTS[0]])[0]:
                 ds[k] = idx[light_color(img, b[k])]
         return b, s, ds
 
-    variants = {}
+    variants: dict[str, dict[str, Any]] = {}
     for key, filt, color in (("A", False, False), ("B", True, False), ("C", True, True)):
-        preds = []
-        for (b, s, l), shape, img in zip(raw, shapes, pics, strict=True):  # noqa: E741
+        preds: list[Pred] = []
+        for det, shape, pic in zip(raw, shapes, pics, strict=True):
             if filt:
-                b, s, l = filter_detections(b, s, l, shape, road_ids, nms_iou=0.7)  # noqa: E741
-            preds.append(to_ds(b, s, l, shape, img, color))
+                det = filter_detections(*det, shape, road_ids, nms_iou=0.7)
+            preds.append(to_ds(*det, pic, color))
         if color:
             p_eval, g_eval, classes, cnames = preds, gts, [idx[n] for n in names], names
         else:
